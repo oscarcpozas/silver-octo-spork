@@ -1,0 +1,14 @@
+[project]
+name = "crypto-market-screener"
+version = "0.0.0"
+requires-python = "==3.12.12"
+
+# Prefer ~= (compat) over >= (floor). Only pin exact versions (==) when necessary.
+dependencies = [
+    "fastapi[standard]~=0.128.0",
+]
+
+[dependency-groups]
+lint = [
+    "ruff~=0.14.14",
+]
