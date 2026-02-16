@@ -7,3 +7,6 @@ uv run fastapi dev
 ```
 
 uv run will automatically resolve and lock the project dependencies (i.e., create a uv.lock alongside the pyproject.toml), create a virtual environment, and run the command in that environment.
+
+
+Check the API docs at http://localhost:8000/docs#/
