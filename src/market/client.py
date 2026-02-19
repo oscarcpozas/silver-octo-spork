@@ -15,6 +15,10 @@ async def fetch_ohlc_bars(
     http_client: httpx.AsyncClient,
 ) -> list[dict]:
     """Fetch OHLC bars from Massive API, following pagination if present."""
+    api_key = get_settings().massive_api_key
+    if not api_key:
+        raise RuntimeError("MASSIVE_API_KEY is required for market data sync")
+
     all_results: list[dict] = []
     url: str | None = (
         f"{BASE_URL}/v2/aggs/ticker/{ticker}/range/{MULTIPLIER}/{TIMESPAN}"
@@ -24,7 +28,7 @@ async def fetch_ohlc_bars(
         "adjusted": "true",
         "sort": "asc",
         "limit": LIMIT,
-        "apiKey": get_settings().massive_api_key,
+        "apiKey": api_key,
     }
 
     while url:
@@ -45,7 +49,7 @@ async def fetch_ohlc_bars(
         if next_url:
             # next_url is a full URL; append apiKey
             url = next_url
-            params = {"apiKey": get_settings().massive_api_key}
+            params = {"apiKey": api_key}
         else:
             url = None
 

@@ -12,4 +12,7 @@ wheels/
 ### Intellij ###
 .idea/
 
+# Environment files — only .env.test is safe to commit (no secrets)
 .env
+.env.dev
+.env.prod

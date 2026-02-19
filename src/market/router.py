@@ -1,10 +1,9 @@
-from sqlalchemy import func, select
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
-from src.database import async_session
 from src.market.constants import TICKERS
-from src.market.models import OHLCBar
-from src.market.schemas import OHLCBarOut, TickerStatus
+from src.market.repository import OHLCRepository, get_ohlc_repository
+from src.market.schemas import AssetDetails, OHLCBarOut, TickerStatus
+from src.market.service import get_asset_details
 
 router = APIRouter(prefix="/market", tags=["market"])
 
@@ -18,36 +17,33 @@ async def list_tickers() -> list[str]:
 async def get_bars(
     ticker: str,
     limit: int = Query(default=100, ge=1, le=5000),
+        repo: OHLCRepository = Depends(get_ohlc_repository),
 ) -> list[OHLCBarOut]:
-    async with async_session() as session:
-        result = await session.execute(
-            select(OHLCBar)
-            .where(OHLCBar.ticker == ticker)
-            .order_by(OHLCBar.timestamp.desc())
-            .limit(limit)
-        )
-        return [OHLCBarOut.model_validate(row) for row in result.scalars().all()]
+    bars = await repo.get_bars(ticker, limit)
+    return [OHLCBarOut.model_validate(bar) for bar in bars]
+
+
+@router.get("/assets/{ticker:path}", response_model=AssetDetails)
+async def asset_details(
+        ticker: str,
+        repo: OHLCRepository = Depends(get_ohlc_repository),
+) -> AssetDetails:
+    if ticker not in TICKERS:
+        raise HTTPException(status_code=404, detail="Ticker not found")
+    details = await get_asset_details(ticker, repo)
+    if details is None:
+        raise HTTPException(status_code=404, detail="No data for ticker")
+    return details
 
 
 @router.get("/status", response_model=list[TickerStatus])
-async def sync_status() -> list[TickerStatus]:
+async def sync_status(
+        repo: OHLCRepository = Depends(get_ohlc_repository),
+) -> list[TickerStatus]:
     statuses: list[TickerStatus] = []
-    async with async_session() as session:
-        for ticker in TICKERS:
-            result = await session.execute(
-                select(
-                    func.count(OHLCBar.id),
-                    func.min(OHLCBar.timestamp),
-                    func.max(OHLCBar.timestamp),
-                ).where(OHLCBar.ticker == ticker)
-            )
-            count, earliest, latest = result.one()
-            statuses.append(
-                TickerStatus(
-                    ticker=ticker,
-                    bar_count=count,
-                    earliest=earliest,
-                    latest=latest,
-                )
-            )
+    for ticker in TICKERS:
+        count, earliest, latest = await repo.get_ticker_status(ticker)
+        statuses.append(
+            TickerStatus(ticker=ticker, bar_count=count, earliest=earliest, latest=latest)
+        )
     return statuses

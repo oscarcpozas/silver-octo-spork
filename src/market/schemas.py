@@ -23,3 +23,15 @@ class TickerStatus(BaseModel):
     bar_count: int
     earliest: datetime | None
     latest: datetime | None
+
+
+class AssetDetails(BaseModel):
+    ticker: str
+    price: float
+    timestamp: datetime
+    open_24h: float
+    high_24h: float
+    low_24h: float
+    volume_24h: float
+    change_24h: float
+    change_pct_24h: float

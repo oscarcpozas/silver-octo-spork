@@ -15,6 +15,8 @@ from src.market.constants import (
     TICKERS,
 )
 from src.market.models import OHLCBar
+from src.market.repository import OHLCRepository
+from src.market.schemas import AssetDetails
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +87,42 @@ async def sync_ticker(ticker: str, http_client: httpx.AsyncClient) -> int:
     inserted = await _bulk_upsert(rows)
     logger.info("Inserted %d new bars for %s", inserted, ticker)
     return inserted
+
+
+async def get_asset_details(ticker: str, repo: OHLCRepository) -> AssetDetails | None:
+    latest = await repo.get_latest_bar(ticker)
+    if latest is None:
+        return None
+
+    since = datetime.now(timezone.utc) - timedelta(hours=24)
+    bars_24h = await repo.get_bars_since(ticker, since)
+
+    if bars_24h:
+        open_24h = bars_24h[0].open
+        high_24h = max(b.high for b in bars_24h)
+        low_24h = min(b.low for b in bars_24h)
+        volume_24h = sum(b.volume for b in bars_24h)
+    else:
+        open_24h = latest.open
+        high_24h = latest.high
+        low_24h = latest.low
+        volume_24h = latest.volume
+
+    price = latest.close
+    change_24h = price - open_24h
+    change_pct_24h = (change_24h / open_24h * 100) if open_24h != 0 else 0.0
+
+    return AssetDetails(
+        ticker=ticker,
+        price=price,
+        timestamp=latest.timestamp,
+        open_24h=open_24h,
+        high_24h=high_24h,
+        low_24h=low_24h,
+        volume_24h=volume_24h,
+        change_24h=change_24h,
+        change_pct_24h=change_pct_24h,
+    )
 
 
 async def sync_all_tickers() -> dict[str, int]:
